@@ -1,0 +1,1268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>소화 미궁: 효소와 영양소의 모험</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background: radial-gradient(circle at top, #1e1b4b, #0f172a);
+            color: #f8fafc;
+            user-select: none;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+        .title-font {
+            font-family: 'Jua', sans-serif;
+        }
+        /* 미로 격자 애니메이션 및 스타일 */
+        .tile {
+            transition: transform 0.15s ease, background-color 0.2s ease;
+        }
+        .player-bob {
+            animation: bob 1.2s infinite ease-in-out;
+        }
+        @keyframes bob {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-3px) scale(1.06); }
+        }
+        .pulse-glow {
+            animation: glow 2s infinite alternate;
+        }
+        @keyframes glow {
+            from { box-shadow: 0 0 5px rgba(250, 204, 21, 0.4); }
+            to { box-shadow: 0 0 18px rgba(250, 204, 21, 0.9); }
+        }
+        .shake {
+            animation: shake 0.35s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(3px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-5px, 0, 0); }
+            40%, 60% { transform: translate3d(5px, 0, 0); }
+        }
+        /* 스크롤바 커스텀 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-between p-3 sm:p-5">
+
+    <!-- 상단 헤더 영역 -->
+    <header class="w-full max-w-5xl flex flex-wrap items-center justify-between gap-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 px-4 py-3 rounded-2xl shadow-xl">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center text-2xl shadow-md">
+                🧬
+            </div>
+            <div>
+                <h1 class="title-font text-xl sm:text-2xl text-amber-300 tracking-wide">소화 미궁: 효소와 영양소</h1>
+                <p class="text-xs text-slate-300">올바른 순서로 소화 효소를 얻어 영양소를 분해하고 탈출하세요!</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3">
+            <!-- 스테이지 선택기 -->
+            <div class="flex items-center bg-slate-900/90 rounded-xl p-1 border border-slate-700" id="stageSelector">
+                <!-- JS로 버튼 생성 -->
+            </div>
+
+            <!-- 랜덤 스테이지 새 맵 생성 버튼 (무한 모드 활성화 시 표시) -->
+            <button id="newRandomBtn" onclick="startRandomStage()" class="hidden px-3 py-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-xl shadow transition items-center gap-1" title="새로운 랜덤 퍼즐 생성">
+                <span>🎲</span> <span class="hidden sm:inline">새 랜덤맵</span>
+            </button>
+
+            <!-- 도감(힌트) 버튼 -->
+            <button onclick="toggleGuideModal(true)" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-xl shadow transition flex items-center gap-1">
+                <span>📖</span> <span class="hidden sm:inline">소화 도감</span>
+            </button>
+
+            <!-- 배경음악/효과음 토글 버튼 -->
+            <button id="bgmToggleBtn" onclick="toggleAudio()" class="px-3 py-2 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 text-xs sm:text-sm font-bold rounded-xl shadow transition flex items-center gap-1" title="배경음악 켜기/끄기">
+                <span id="bgmIcon">🔇</span> <span id="bgmLabel" class="hidden sm:inline">음악 끔</span>
+            </button>
+
+            <!-- 초기화 버튼 -->
+            <button onclick="resetStage()" class="px-3 py-2 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-xl shadow transition flex items-center gap-1" title="현재 스테이지 처음부터 다시 시작">
+                <span>🔄</span> <span>초기화</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 메인 게임 컨테이너 -->
+    <main class="w-full max-w-5xl flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 my-4 items-start">
+        
+        <!-- 왼쪽/상단: 게임 맵 보드 -->
+        <section class="lg:col-span-7 flex flex-col items-center bg-slate-800/70 border border-slate-700 rounded-2xl p-3 sm:p-5 shadow-2xl">
+            <!-- 스테이지 정보 배너 -->
+            <div class="w-full flex items-center justify-between mb-3 pb-2 border-b border-slate-700/80">
+                <div>
+                    <span id="stageBadge" class="px-2.5 py-0.5 text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full">STAGE 1</span>
+                    <h2 id="stageTitle" class="title-font text-lg sm:text-xl text-white mt-1">입과 위의 기초 소화</h2>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs text-slate-400">이동 횟수</div>
+                    <div id="moveCount" class="font-bold text-lg text-emerald-400">0회</div>
+                </div>
+            </div>
+
+            <!-- 미로 그리드 보드 -->
+            <div id="boardWrapper" class="relative w-full max-w-[460px] aspect-square bg-slate-950 p-2 rounded-2xl border-2 border-slate-700 shadow-inner flex items-center justify-center">
+                <div id="gameBoard" class="w-full h-full grid gap-1">
+                    <!-- JS로 타일 렌더링 -->
+                </div>
+            </div>
+
+            <!-- 모바일 전용 터치 방향키 컨트롤러 (PC 화면에서는 숨김 처리) -->
+            <div class="mt-3 grid lg:hidden grid-cols-3 gap-2 w-48 sm:w-52 bg-slate-900/80 p-2 rounded-2xl border border-slate-700/80 shadow-lg">
+                <div></div>
+                <button type="button" onclick="movePlayer(0, -1)" class="h-12 bg-slate-700 hover:bg-slate-600 active:bg-amber-500 active:text-slate-950 rounded-xl flex items-center justify-center text-xl font-bold shadow-md transition">▲</button>
+                <div></div>
+                <button type="button" onclick="movePlayer(-1, 0)" class="h-12 bg-slate-700 hover:bg-slate-600 active:bg-amber-500 active:text-slate-950 rounded-xl flex items-center justify-center text-xl font-bold shadow-md transition">◀</button>
+                <button type="button" onclick="movePlayer(0, 1)" class="h-12 bg-slate-700 hover:bg-slate-600 active:bg-amber-500 active:text-slate-950 rounded-xl flex items-center justify-center text-xl font-bold shadow-md transition">▼</button>
+                <button type="button" onclick="movePlayer(1, 0)" class="h-12 bg-slate-700 hover:bg-slate-600 active:bg-amber-500 active:text-slate-950 rounded-xl flex items-center justify-center text-xl font-bold shadow-md transition">▶</button>
+            </div>
+
+            <!-- PC 조작 안내 배지 (모바일 화면에서는 숨김 처리) -->
+            <div class="hidden lg:flex items-center justify-center gap-2 mt-3 px-4 py-2 rounded-xl bg-slate-900/80 border border-slate-700/80 text-xs text-slate-300">
+                <span>⌨️ PC 조작법:</span>
+                <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300 font-bold">W</kbd>
+                <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300 font-bold">A</kbd>
+                <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300 font-bold">S</kbd>
+                <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-300 font-bold">D</kbd>
+                <span>또는</span>
+                <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-sky-300 font-bold">↑↓←→</kbd>
+                <span class="text-slate-500">|</span>
+                <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-rose-300 font-bold">R</kbd>
+                <span>초기화</span>
+            </div>
+
+            <!-- 상태 알림 메시지 박스 (alert 대신 사용) -->
+            <div id="statusBanner" class="w-full mt-3 px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-700 text-sm text-center font-medium text-sky-300 min-h-[44px] flex items-center justify-center transition-all">
+                PC는 WASD/방향키, 모바일은 화면 방향키로 이동하세요!
+            </div>
+        </section>
+
+        <!-- 오른쪽/하단: 인벤토리, 목표, 문 조건 정보 패널 -->
+        <aside class="lg:col-span-5 flex flex-col gap-4">
+            
+            <!-- 1. 현재 보유 영양소 (가방) -->
+            <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="title-font text-lg text-emerald-300 flex items-center gap-2">
+                        <span>🎒</span> 현재 보유 중인 영양소
+                    </h3>
+                    <span class="text-xs text-slate-400">효소를 만나면 변화합니다</span>
+                </div>
+                <div id="inventoryList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 min-h-[70px]">
+                    <!-- JS로 보유 영양소 렌더링 -->
+                </div>
+            </div>
+
+            <!-- 2. 최종 탈출 목표 -->
+            <div class="bg-gradient-to-br from-indigo-950/90 to-slate-900 border border-indigo-500/40 rounded-2xl p-4 shadow-xl">
+                <h3 class="title-font text-lg text-amber-300 flex items-center gap-2 mb-2">
+                    <span>🚪</span> 최종 출구(소장 융털) 탈출 조건
+                </h3>
+                <p class="text-xs text-slate-300 mb-3">출구로 나가려면 아래의 최종 분해 산물을 모두 가지고 있어야 합니다:</p>
+                <div id="goalList" class="flex flex-wrap gap-2">
+                    <!-- JS로 목표 아이템 렌더링 -->
+                </div>
+            </div>
+
+            <!-- 3. 스테이지 내 잠긴 문 & 힌트 안내 -->
+            <div class="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 shadow-xl">
+                <h3 class="title-font text-lg text-sky-300 flex items-center gap-2 mb-2">
+                    <span>🔐</span> 스테이지의 문 & 규칙 안내
+                </h3>
+                <div id="doorInfoList" class="space-y-2 text-xs">
+                    <!-- JS로 스테이지 문 조건 렌더링 -->
+                </div>
+                <div class="mt-3 pt-3 border-t border-slate-700/80 text-xs text-rose-300 flex items-start gap-2">
+                    <span>⚠️</span>
+                    <span><b>주의:</b> 잘못된 순서로 효소를 먼저 먹어버리면 문을 열 수 있는 영양소가 사라져 진행이 막힐 수 있습니다! 그럴 땐 상단의 <b>[초기화]</b> 버튼을 눌러주세요.</span>
+                </div>
+            </div>
+
+        </aside>
+    </main>
+
+    <!-- 소화 효소 & 영양소 도감 모달 -->
+    <div id="guideModal" class="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-600 rounded-2xl max-w-lg w-full p-5 shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3 mb-4">
+                <h3 class="title-font text-xl text-amber-300">📖 영양소와 소화 효소 반응 도감</h3>
+                <button onclick="toggleGuideModal(false)" class="text-slate-400 hover:text-white text-xl font-bold px-2">✕</button>
+            </div>
+            <div class="space-y-3 text-sm">
+                <div class="p-3 rounded-xl bg-slate-900/80 border border-amber-500/30">
+                    <div class="font-bold text-amber-300 mb-1">🍞 탄수화물 소화 과정</div>
+                    <p class="text-slate-300 text-xs leading-relaxed">
+                        • <b>녹말</b> + <span class="text-sky-400 font-bold">[아밀레이스]</span> ➔ <b>엿당</b><br>
+                        • <b>엿당</b> + <span class="text-sky-400 font-bold">[말테이스]</span> ➔ <span class="text-emerald-400 font-bold">포도당 (최종)</span>
+                    </p>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-900/80 border border-rose-500/30">
+                    <div class="font-bold text-rose-300 mb-1">🥩 단백질 소화 과정</div>
+                    <p class="text-slate-300 text-xs leading-relaxed">
+                        • <b>단백질</b> + <span class="text-sky-400 font-bold">[펩신]</span> 또는 <span class="text-sky-400 font-bold">[트립신]</span> ➔ <b>중간 단백질(폴리펩타이드)</b><br>
+                        • <b>중간 단백질</b> + <span class="text-sky-400 font-bold">[펩티데이스]</span> ➔ <span class="text-emerald-400 font-bold">아미노산 (최종)</span>
+                    </p>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-900/80 border border-yellow-500/30">
+                    <div class="font-bold text-yellow-300 mb-1">🧈 지방 소화 과정</div>
+                    <p class="text-slate-300 text-xs leading-relaxed">
+                        • <b>지방</b> + <span class="text-sky-400 font-bold">[라이페이스]</span> ➔ <span class="text-emerald-400 font-bold">지방산과 모노글리세라이드 (최종)</span>
+                    </p>
+                </div>
+                <div class="p-3 rounded-xl bg-indigo-950/60 border border-indigo-500/30 text-xs text-indigo-200">
+                    💡 <b>퍼즐 공략 팁:</b> 어떤 문은 분해되기 전의 <b>'녹말'</b>이나 <b>'단백질'</b>을 요구하고, 어떤 문은 분해된 후의 <b>'엿당'</b>이나 <b>'아미노산'</b>을 요구합니다. 방 안의 효소를 줍기 전에 어느 문을 먼저 열어야 할지 순서를 잘 생각하세요!
+                </div>
+            </div>
+            <button onclick="toggleGuideModal(false)" class="w-full mt-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl transition">확인했습니다</button>
+        </div>
+    </div>
+
+    <!-- 스테이지 클리어 모달 -->
+    <div id="clearModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-slate-800 border-2 border-amber-400 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl">
+            <div class="text-5xl mb-3">🎉</div>
+            <h3 class="title-font text-2xl text-amber-300 mb-2">소화 및 흡수 완료!</h3>
+            <p id="clearMessage" class="text-sm text-slate-300 mb-4">모든 영양소를 완벽하게 분해하여 출구로 탈출했습니다!</p>
+            <div class="bg-slate-900 rounded-xl p-3 mb-5 text-xs text-slate-300 flex justify-around">
+                <div>총 이동 횟수: <span id="clearMoves" class="text-emerald-400 font-bold text-sm">0</span>회</div>
+                <div>클리어 스테이지: <span id="clearStageNum" class="text-amber-400 font-bold text-sm">1</span></div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="resetStage(); closeClearModal();" class="flex-1 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition">다시 하기</button>
+                <button id="nextStageBtn" onclick="nextStage()" class="flex-1 py-2.5 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-bold rounded-xl shadow-lg transition">다음 스테이지 ▶</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ==========================================
+         * 1. 영양소 및 소화 효소 데이터 정의
+         * ==========================================
+         */
+        const NUTRIENTS = {
+            'starch': { name: '녹말', icon: '🍞', color: 'bg-amber-500/20 text-amber-300 border-amber-500/40', desc: '다당류 탄수화물' },
+            'maltose': { name: '엿당', icon: '🍯', color: 'bg-orange-500/20 text-orange-300 border-orange-500/40', desc: '이당류 (녹말 분해)' },
+            'glucose': { name: '포도당', icon: '🍬', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', desc: '최종 탄수화물 산물' },
+            
+            'protein': { name: '단백질', icon: '🥩', color: 'bg-rose-500/20 text-rose-300 border-rose-500/40', desc: '고분자 단백질' },
+            'polypeptide': { name: '중간 단백질', icon: '🍗', color: 'bg-pink-500/20 text-pink-300 border-pink-500/40', desc: '폴리펩타이드' },
+            'amino_acid': { name: '아미노산', icon: '🧬', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', desc: '최종 단백질 산물' },
+            
+            'fat': { name: '지방', icon: '🧈', color: 'bg-yellow-500/20 text-yellow-200 border-yellow-500/40', desc: '중성 지방' },
+            'fatty_acid': { name: '지방산+모노글리세라이드', icon: '💧', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', desc: '최종 지방 산물' }
+        };
+
+        const ENZYMES = {
+            'amylase': {
+                name: '아밀레이스',
+                icon: '🧪',
+                badgeColor: 'bg-sky-500',
+                from: 'starch',
+                to: 'maltose',
+                desc: '녹말 ➔ 엿당으로 분해'
+            },
+            'maltase': {
+                name: '말테이스',
+                icon: '⚗️',
+                badgeColor: 'bg-teal-500',
+                from: 'maltose',
+                to: 'glucose',
+                desc: '엿당 ➔ 포도당으로 분해'
+            },
+            'pepsin': {
+                name: '펩신',
+                icon: '🧫',
+                badgeColor: 'bg-purple-500',
+                from: 'protein',
+                to: 'polypeptide',
+                desc: '단백질 ➔ 중간 단백질로 분해'
+            },
+            'peptidase': {
+                name: '펩티데이스',
+                icon: '🔬',
+                badgeColor: 'bg-indigo-500',
+                from: 'polypeptide',
+                to: 'amino_acid',
+                desc: '중간 단백질 ➔ 아미노산으로 분해'
+            },
+            'lipase': {
+                name: '라이페이스',
+                icon: '🫧',
+                badgeColor: 'bg-amber-600',
+                from: 'fat',
+                to: 'fatty_acid',
+                desc: '지방 ➔ 지방산과 모노글리세라이드로 분해'
+            }
+        };
+
+        /**
+         * ==========================================
+         * 2. 스테이지 설계 (퍼즐 로직 포함)
+         * ==========================================
+         * 맵 기호 설명:
+         * '#' : 벽
+         * '.' : 통로
+         * 'P' : 플레이어 시작 위치
+         * 'E' : 최종 출구
+         * 'D1', 'D2'... : 잠긴 문 (doors 객체에서 조건 정의)
+         * 'I1', 'I2'... : 효소 아이템 (items 객체에서 정의)
+         */
+        const STAGES = [
+            {
+                id: 1,
+                title: '1단계: 녹말과 단백질의 첫걸음',
+                hint: '녹말 문을 먼저 열어야 펩신을 얻을 수 있어요! 아밀레이스를 먼저 먹으면 녹말이 엿당으로 변해 녹말 문을 열 수 없게 됩니다.',
+                initialInventory: ['starch', 'protein'], // 녹말, 단백질 시작
+                goal: ['maltose', 'polypeptide'], // 엿당, 중간 단백질로 만들어 출구 도달
+                grid: [
+                    ['#', '#', '#', '#', '#', '#', '#'],
+                    ['#', 'P', '.', 'D1', 'I2', '.', '#'],
+                    ['#', '.', '#', '#', '#', '.', '#'],
+                    ['#', 'I1', '.', 'D2', '.', '.', '#'],
+                    ['#', '#', '#', '#', '#', 'D3', '#'],
+                    ['#', '.', '.', '.', '.', 'E', '#'],
+                    ['#', '#', '#', '#', '#', '#', '#']
+                ],
+                doors: {
+                    'D1': { req: 'starch', label: '녹말 문', desc: '분해되지 않은 [녹말]이 있어야 열립니다.' },
+                    'D2': { req: 'maltose', label: '엿당 문', desc: '[엿당]이 있어야 열립니다.' },
+                    'D3': { req: 'polypeptide', label: '중간단백질 문', desc: '[중간 단백질]이 있어야 열립니다.' }
+                },
+                items: {
+                    'I1': 'amylase', // 녹말 -> 엿당
+                    'I2': 'pepsin'   // 단백질 -> 중간 단백질
+                }
+            },
+            {
+                id: 2,
+                title: '2단계: 3대 영양소 소화 작전',
+                hint: '단백질 문을 먼저 열어 라이페이스를 얻고, 지방을 분해해 지방산 문을 여세요! 펩신을 너무 일찍 먹으면 단백질 문이 막힙니다.',
+                initialInventory: ['starch', 'protein', 'fat'],
+                goal: ['maltose', 'polypeptide', 'fatty_acid'],
+                grid: [
+                    ['#', '#', '#', '#', '#', '#', '#', '#'],
+                    ['#', 'P', '.', '.', 'D1', 'I3', '.', '#'],
+                    ['#', '.', '#', '#', '#', '#', '.', '#'],
+                    ['#', 'I1', '.', 'D2', '.', '.', '.', '#'],
+                    ['#', '#', '#', '#', '#', 'D3', '#', '#'],
+                    ['#', 'E', 'D4', '.', '.', 'I2', '.', '#'],
+                    ['#', '#', '#', '#', '#', '#', '#', '#']
+                ],
+                doors: {
+                    'D1': { req: 'protein', label: '단백질 문', desc: '분해 전 [단백질]이 필요합니다.' },
+                    'D2': { req: 'maltose', label: '엿당 문', desc: '[엿당]이 필요합니다.' },
+                    'D3': { req: 'fatty_acid', label: '지방산 문', desc: '[지방산+모노글리세라이드]가 필요합니다.' },
+                    'D4': { req: 'polypeptide', label: '중간단백질 문', desc: '[중간 단백질]이 필요합니다.' }
+                },
+                items: {
+                    'I1': 'amylase',
+                    'I2': 'pepsin',
+                    'I3': 'lipase'
+                }
+            },
+            {
+                id: 3,
+                title: '3단계: 완전 소화와 소장 흡수 (고난이도)',
+                hint: '녹말을 한 번에 포도당까지 만들지 마세요! 중간 산물인 [엿당] 상태일 때 열어야 하는 문이 있습니다.',
+                initialInventory: ['starch', 'protein', 'fat'],
+                goal: ['glucose', 'amino_acid', 'fatty_acid'],
+                grid: [
+                    ['#', '#', '#', '#', '#', '#', '#', '#', '#'],
+                    ['#', 'P', '.', 'I1', '#', 'I4', '.', 'D3', '#'],
+                    ['#', '.', '#', '.', '#', '.', '#', '.', '#'],
+                    ['#', 'D1', '#', 'D2', '.', '.', '#', 'I5', '#'],
+                    ['#', '.', '#', '#', '#', 'D4', '#', '.', '#'],
+                    ['#', 'I2', '.', 'I3', '#', '.', '.', 'D5', '#'],
+                    ['#', '#', '#', '#', '#', '#', '#', 'E', '#'],
+                    ['#', '#', '#', '#', '#', '#', '#', '#', '#']
+                ],
+                doors: {
+                    'D1': { req: 'starch', label: '녹말 문', desc: '[녹말] 상태일 때만 통과 가능!' },
+                    'D2': { req: 'maltose', label: '엿당 문', desc: '1차 분해된 [엿당] 상태일 때만 통과 가능!' },
+                    'D3': { req: 'fat', label: '지방 문', desc: '분해 전 [지방] 상태여야 열립니다!' },
+                    'D4': { req: 'glucose', label: '포도당 문', desc: '최종 분해된 [포도당]이 필요합니다.' },
+                    'D5': { req: 'amino_acid', label: '아미노산 문', desc: '최종 분해된 [아미노산]이 필요합니다.' }
+                },
+                items: {
+                    'I1': 'amylase',   // 녹말 -> 엿당
+                    'I2': 'pepsin',    // 단백질 -> 중간 단백질
+                    'I3': 'maltase',   // 엿당 -> 포도당
+                    'I4': 'peptidase', // 중간 단백질 -> 아미노산
+                    'I5': 'lipase'     // 지방 -> 지방산+모노글리세라이드
+                }
+            }
+        ];
+
+        /**
+         * ==========================================
+         * 3. 게임 상태 관리 변수
+         * ==========================================
+         */
+        let currentStageIndex = 0;
+        let activeStageData = null; // 현재 플레이 중인 스테이지 데이터 (기본 또는 랜덤)
+        let isRandomMode = false;
+        let clearedBasicStages = new Set(); // 클리어한 기본 스테이지 ID 기록
+        let randomClearCount = 0; // 랜덤 모드 연속 클리어 횟수
+
+        let gridState = [];
+        let playerPos = { x: 0, y: 0 };
+        let inventory = [];
+        let openedDoors = new Set();
+        let collectedItems = new Set();
+        let moveCount = 0;
+        let isCleared = false;
+
+        /**
+         * ==========================================
+         * 4. 초기화 및 스테이지 로드 로직
+         * ==========================================
+         */
+        function initGame() {
+            renderStageButtons();
+            loadStage(0);
+        }
+
+        function isAllBasicCleared() {
+            return STAGES.every(s => clearedBasicStages.has(s.id));
+        }
+
+        function renderStageButtons() {
+            const selector = document.getElementById('stageSelector');
+            selector.innerHTML = '';
+            STAGES.forEach((stage, idx) => {
+                const isDone = clearedBasicStages.has(stage.id);
+                const btn = document.createElement('button');
+                btn.innerHTML = `${stage.id}단계${isDone ? '✓' : ''}`;
+                btn.className = `px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                    !isRandomMode && idx === currentStageIndex
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : isDone
+                            ? 'text-emerald-400 hover:text-emerald-300'
+                            : 'text-slate-400 hover:text-white'
+                }`;
+                btn.onclick = () => loadStage(idx);
+                selector.appendChild(btn);
+            });
+
+            // 무한 랜덤 모드 버튼 추가 (기본 스테이지 모두 클리어 시 해금)
+            const unlocked = isAllBasicCleared();
+            const rndBtn = document.createElement('button');
+            rndBtn.innerHTML = unlocked ? `🎲 무한` : `🔒 무한`;
+            rndBtn.title = unlocked ? '랜덤 스테이지 생성 및 플레이' : '1~3단계를 모두 클리어하면 해금됩니다!';
+            rndBtn.className = `ml-1 px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                isRandomMode
+                    ? 'bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow'
+                    : unlocked
+                        ? 'text-fuchsia-300 hover:bg-slate-800'
+                        : 'text-slate-600 cursor-not-allowed'
+            }`;
+            rndBtn.onclick = () => {
+                if (unlocked) {
+                    startRandomStage();
+                } else {
+                    triggerShake();
+                    setStatus('🔒 기본 1~3단계를 모두 클리어하면 [무한 랜덤 미궁]이 해금됩니다!', 'warn');
+                }
+            };
+            selector.appendChild(rndBtn);
+
+            // 상단 '새 랜덤맵' 버튼 표시 제어
+            const newRandomBtn = document.getElementById('newRandomBtn');
+            if (isRandomMode) {
+                newRandomBtn.classList.remove('hidden');
+                newRandomBtn.classList.add('flex');
+            } else {
+                newRandomBtn.classList.add('hidden');
+                newRandomBtn.classList.remove('flex');
+            }
+        }
+
+        function loadStage(index) {
+            isRandomMode = false;
+            currentStageIndex = index;
+            activeStageData = STAGES[index];
+            setupStageState(activeStageData);
+        }
+
+        function startRandomStage() {
+            isRandomMode = true;
+            activeStageData = generateRandomStage(randomClearCount + 1);
+            setupStageState(activeStageData);
+        }
+
+        function setupStageState(stage) {
+            // 상태 초기화
+            gridState = stage.grid.map(row => [...row]);
+            inventory = [...stage.initialInventory];
+            openedDoors = new Set();
+            collectedItems = new Set();
+            moveCount = 0;
+            isCleared = false;
+
+            // 플레이어 시작 좌표 찾기
+            for (let y = 0; y < gridState.length; y++) {
+                for (let x = 0; x < gridState[y].length; x++) {
+                    if (gridState[y][x] === 'P') {
+                        playerPos = { x, y };
+                        gridState[y][x] = '.';
+                    }
+                }
+            }
+
+            renderStageButtons();
+            updateUI();
+            setStatus(`💡 힌트: ${stage.hint}`, 'info');
+        }
+
+        function resetStage() {
+            // 현재 플레이 중인 맵(기본 또는 현재 랜덤맵)을 처음 상태로 리셋
+            setupStageState(activeStageData);
+            setStatus('🔄 현재 스테이지가 초기화되었습니다. 순서를 다시 계획해 보세요!', 'warn');
+        }
+
+        function nextStage() {
+            closeClearModal();
+            if (isRandomMode) {
+                startRandomStage();
+            } else if (currentStageIndex < STAGES.length - 1) {
+                loadStage(currentStageIndex + 1);
+            } else if (isAllBasicCleared()) {
+                startRandomStage();
+            } else {
+                // 아직 안 깬 기본 스테이지가 있다면 그곳으로 안내
+                const unplayedIdx = STAGES.findIndex(s => !clearedBasicStages.has(s.id));
+                loadStage(unplayedIdx !== -1 ? unplayedIdx : 0);
+            }
+        }
+
+        /**
+         * ==========================================
+         * 4-1. 솔버블(Solvable) 랜덤 스테이지 생성기
+         * ==========================================
+         * 논리적 순서가 보장되는 퍼즐 구조를 동적으로 조립합니다:
+         * - 시작 지점에서 효소 A는 바로 접근 가능하지만, 효소 B는 [초기 영양소 A 문] 뒤에 숨겨둠
+         * - 따라서 효소 A를 먼저 먹어버리면 초기 영양소 A가 사라져 문을 못 여는 함정 성립!
+         * - 올바른 순서: [초기 영양소 A 문] 개방 -> 효소 B 획득 -> 효소 A 획득 -> 변환된 영양소 문 개방 -> 출구
+         */
+        function generateRandomStage(levelNum) {
+            const chains = [
+                {
+                    initial: 'starch',
+                    mid: 'maltose',
+                    final: 'glucose',
+                    enz1: 'amylase',
+                    enz2: 'maltase'
+                },
+                {
+                    initial: 'protein',
+                    mid: 'polypeptide',
+                    final: 'amino_acid',
+                    enz1: 'pepsin',
+                    enz2: 'peptidase'
+                },
+                {
+                    initial: 'fat',
+                    mid: 'fatty_acid',
+                    final: 'fatty_acid',
+                    enz1: 'lipase',
+                    enz2: null
+                }
+            ];
+
+            // 무작위로 2개 또는 3개의 영양소 계열 선택
+            const shuffled = [...chains].sort(() => Math.random() - 0.5);
+            const count = Math.random() < 0.45 ? 2 : 3;
+            const selected = shuffled.slice(0, count);
+
+            const chainA = selected[0]; // 핵심 함정(선행 문 조건)이 걸리는 영양소
+            const chainB = selected[1]; // 두 번째 영양소
+            const chainC = selected[2] || null; // 세 번째 영양소 (선택)
+
+            const initialInventory = selected.map(c => c.initial);
+            const doors = {};
+            const items = {};
+            const goal = [];
+
+            // [퍼즐 설계]
+            // 1. D1 문은 chainA의 '초기 상태'를 요구함 (즉, chainA의 1차 효소 I1을 먹기 전에 열어야 함!)
+            doors['D1'] = {
+                req: chainA.initial,
+                label: `${NUTRIENTS[chainA.initial].name} 문`,
+                desc: `분해 전 [${NUTRIENTS[chainA.initial].name}] 상태일 때만 열립니다!`
+            };
+
+            // 2. D1 문 안쪽 방에 chainB의 1차 효소(I2) 배치
+            items['I2'] = chainB.enz1;
+
+            // 3. 시작 구역 쪽에 chainA의 1차 효소(I1) 배치 (함정 역할: D1 열기 전에 먹으면 막힘)
+            items['I1'] = chainA.enz1;
+
+            // 4. D2 문은 chainB가 1차 분해된 상태(chainB.mid)를 요구함
+            doors['D2'] = {
+                req: chainB.mid,
+                label: `${NUTRIENTS[chainB.mid].name} 문`,
+                desc: `[${NUTRIENTS[chainB.mid].name}](으)로 분해되어야 열립니다.`
+            };
+
+            // 목표 및 추가 효소 구성
+            let currentA = chainA.mid;
+            let currentB = chainB.mid;
+
+            // chainA에 2차 효소가 있다면 D2 안쪽에 배치해 완전 소화 유도
+            if (chainA.enz2 && Math.random() < 0.7) {
+                items['I3'] = chainA.enz2;
+                currentA = chainA.final;
+            }
+            goal.push(currentA);
+            goal.push(currentB);
+
+            // 5. D3 문은 chainA의 최종 목표 상태(currentA)를 요구함
+            doors['D3'] = {
+                req: currentA,
+                label: `${NUTRIENTS[currentA].name} 문`,
+                desc: `[${NUTRIENTS[currentA].name}]이(가) 필요합니다.`
+            };
+
+            // 3개 영양소 모드일 경우 chainC 처리
+            let hasExtraItem = false;
+            let hasExtraDoor = false;
+            if (chainC) {
+                items['I4'] = chainC.enz1;
+                hasExtraItem = true;
+                doors['D4'] = {
+                    req: chainC.mid,
+                    label: `${NUTRIENTS[chainC.mid].name} 문`,
+                    desc: `[${NUTRIENTS[chainC.mid].name}]이(가) 필요합니다.`
+                };
+                hasExtraDoor = true;
+                goal.push(chainC.mid);
+            }
+
+            // 2가지 미로 레이아웃 템플릿 중 무작위 선택 + 좌우/상하 반전으로 다양성 극대화
+            const templates = [
+                // 템플릿 A (8x7)
+                [
+                    ['#', '#', '#', '#', '#', '#', '#', '#'],
+                    ['#', 'P', '.', '.', 'D1', 'I2', '.', '#'],
+                    ['#', '.', '#', '#', '#', '#', '.', '#'],
+                    ['#', 'I1', '.', 'D2', '.', 'I3', '.', '#'],
+                    ['#', '#', '#', '#', '#', 'D3', '#', '#'],
+                    ['#', 'E', 'D4', '.', 'I4', '.', '.', '#'],
+                    ['#', '#', '#', '#', '#', '#', '#', '#']
+                ],
+                // 템플릿 B (8x8)
+                [
+                    ['#', '#', '#', '#', '#', '#', '#', '#'],
+                    ['#', 'P', '.', 'I1', '#', 'I2', '.', '#'],
+                    ['#', '.', '#', '#', '#', 'D1', '#', '#'],
+                    ['#', '.', '.', '.', '.', '.', '.', '#'],
+                    ['#', '#', '#', 'D2', '#', '#', '.', '#'],
+                    ['#', 'I3', '.', '.', '.', 'D3', '.', '#'],
+                    ['#', '#', '#', 'I4', '.', 'D4', 'E', '#'],
+                    ['#', '#', '#', '#', '#', '#', '#', '#']
+                ]
+            ];
+
+            let grid = templates[Math.floor(Math.random() * templates.length)].map(row => [...row]);
+
+            // 불필요한 슬롯('I3', 'I4', 'D4')은 일반 통로('.')로 치환
+            for (let y = 0; y < grid.length; y++) {
+                for (let x = 0; x < grid[y].length; x++) {
+                    const cell = grid[y][x];
+                    if (cell === 'I3' && !items['I3']) grid[y][x] = '.';
+                    if (cell === 'I4' && !hasExtraItem) grid[y][x] = '.';
+                    if (cell === 'D4' && !hasExtraDoor) grid[y][x] = '.';
+                }
+            }
+
+            // 50% 확률로 좌우 반전, 50% 확률로 상하 반전 적용 (시각적 신선함 제공)
+            if (Math.random() < 0.5) {
+                grid = grid.map(row => [...row].reverse());
+            }
+            if (Math.random() < 0.5) {
+                grid = [...grid].reverse();
+            }
+
+            return {
+                id: `R-${levelNum}`,
+                title: `무한 랜덤 미궁 #${levelNum}`,
+                hint: `[${NUTRIENTS[chainA.initial].name} 문]을 먼저 열어야 합니다! [${ENZYMES[chainA.enz1].name}]을 먼저 먹으면 [${NUTRIENTS[chainA.initial].name}]이 변해 문이 막힙니다.`,
+                initialInventory,
+                goal,
+                grid,
+                doors,
+                items
+            };
+        }
+
+        /**
+         * ==========================================
+         * 5. 플레이어 이동 및 상호작용 핵심 로직
+         * ==========================================
+         */
+        function movePlayer(dx, dy) {
+            if (isCleared) return;
+
+            const newX = playerPos.x + dx;
+            const newY = playerPos.y + dy;
+            const stage = activeStageData;
+
+            // 맵 범위 및 벽 충돌 체크
+            if (newY < 0 || newY >= gridState.length || newX < 0 || newX >= gridState[0].length) return;
+            const cell = gridState[newY][newX];
+
+            if (cell === '#') {
+                triggerShake();
+                playSfx('bump');
+                return;
+            }
+
+            // 1. 잠긴 문(D1, D2...)과 마주쳤을 때
+            if (cell.startsWith('D') && !openedDoors.has(cell)) {
+                const door = stage.doors[cell];
+                if (inventory.includes(door.req)) {
+                    // 문 열기 성공! (영양소는 소모되지 않고 열쇠처럼 조건만 충족하면 통과)
+                    openedDoors.add(cell);
+                    playerPos = { x: newX, y: newY };
+                    moveCount++;
+                    playSfx('door');
+                    setStatus(`🔓 [${NUTRIENTS[door.req].name}]을(를) 확인하여 '${door.label}'을 열었습니다!`, 'success');
+                    updateUI();
+                    checkDeadlock();
+                } else {
+                    // 조건 불충족 -> 진행 막힘
+                    triggerShake();
+                    playSfx('bump');
+                    const reqName = NUTRIENTS[door.req].name;
+                    setStatus(`⛔ 잠겨 있습니다! 이 문을 열려면 [${reqName}]이(가) 필요합니다.`, 'error');
+                }
+                return;
+            }
+
+            // 2. 소화 효소 아이템(I1, I2...) 획득 시
+            if (cell.startsWith('I') && !collectedItems.has(cell)) {
+                const enzymeKey = stage.items[cell];
+                const enzyme = ENZYMES[enzymeKey];
+
+                collectedItems.add(cell);
+                playerPos = { x: newX, y: newY };
+                moveCount++;
+                playSfx('enzyme');
+
+                // 보유 중인 영양소 중 반응 가능한 영양소가 있는지 확인 후 변환
+                const targetIdx = inventory.indexOf(enzyme.from);
+                if (targetIdx !== -1) {
+                    inventory[targetIdx] = enzyme.to;
+                    const fromName = NUTRIENTS[enzyme.from].name;
+                    const toName = NUTRIENTS[enzyme.to].name;
+                    setStatus(`🧪 [${enzyme.name}] 획득! 보유한 [${fromName}]이(가) [${toName}](으)로 분해되었습니다!`, 'success');
+                } else {
+                    setStatus(`🧪 [${enzyme.name}]을(를) 얻었지만, 반응할 [${NUTRIENTS[enzyme.from].name}]이(가) 없습니다.`, 'warn');
+                }
+
+                updateUI();
+                checkDeadlock();
+                return;
+            }
+
+            // 3. 최종 출구(E) 도달 시
+            if (cell === 'E') {
+                const missingGoals = stage.goal.filter(req => !inventory.includes(req));
+                if (missingGoals.length === 0) {
+                    playerPos = { x: newX, y: newY };
+                    moveCount++;
+                    isCleared = true;
+                    playSfx('clear');
+
+                    if (isRandomMode) {
+                        randomClearCount++;
+                    } else {
+                        clearedBasicStages.add(stage.id);
+                    }
+
+                    renderStageButtons();
+                    updateUI();
+                    showClearModal();
+                } else {
+                    triggerShake();
+                    playSfx('bump');
+                    const missingNames = missingGoals.map(k => NUTRIENTS[k].name).join(', ');
+                    setStatus(`🚪 아직 탈출할 수 없습니다! 부족한 최종 영양소: [${missingNames}]`, 'error');
+                }
+                return;
+            }
+
+            // 4. 일반 통로 이동
+            playerPos = { x: newX, y: newY };
+            moveCount++;
+            playSfx('step');
+            updateUI();
+        }
+
+        /**
+         * 잘못된 순서로 진행하여 영구적으로 막혔는지(소프트락) 감지하여 안내
+         */
+        function checkDeadlock() {
+            const stage = activeStageData;
+            // 아직 열리지 않은 문 중에서 요구하는 영양소가 이미 상위 단계로 분해되어 버렸는지 체크
+            const hierarchy = {
+                'starch': 1, 'maltose': 2, 'glucose': 3,
+                'protein': 1, 'polypeptide': 2, 'amino_acid': 3,
+                'fat': 1, 'fatty_acid': 2
+            };
+            const family = {
+                'starch': 'carb', 'maltose': 'carb', 'glucose': 'carb',
+                'protein': 'prot', 'polypeptide': 'prot', 'amino_acid': 'prot',
+                'fat': 'fat', 'fatty_acid': 'fat'
+            };
+
+            for (const [doorKey, doorInfo] of Object.entries(stage.doors)) {
+                if (!openedDoors.has(doorKey)) {
+                    const reqNutrient = doorInfo.req;
+                    const reqFam = family[reqNutrient];
+                    const reqLevel = hierarchy[reqNutrient];
+
+                    // 같은 계열 영양소가 현재 인벤토리에서 이미 더 높은 분해 단계로 변해버렸다면 되돌릴 수 없음!
+                    const currentSameFam = inventory.find(item => family[item] === reqFam);
+                    if (currentSameFam && hierarchy[currentSameFam] > reqLevel) {
+                        setTimeout(() => {
+                            setStatus(`⚠️ 경고: [${NUTRIENTS[reqNutrient].name}]이(가) 이미 [${NUTRIENTS[currentSameFam].name}](으)로 분해되어 '${doorInfo.label}'을 열 수 없습니다! [초기화]를 눌러 다시 시도하세요.`, 'error');
+                        }, 900);
+                        break;
+                    }
+                }
+            }
+        }
+
+        /**
+         * ==========================================
+         * 6. UI 렌더링 함수
+         * ==========================================
+         */
+        function updateUI() {
+            const stage = activeStageData;
+            document.getElementById('stageBadge').textContent = isRandomMode ? `RANDOM #${randomClearCount + 1}` : `STAGE ${stage.id}`;
+            document.getElementById('stageTitle').textContent = stage.title;
+            document.getElementById('moveCount').textContent = `${moveCount}회`;
+
+            renderBoard();
+            renderInventory();
+            renderGoals();
+            renderDoorInfo();
+        }
+
+        function renderBoard() {
+            const stage = activeStageData;
+            const board = document.getElementById('gameBoard');
+            const rows = gridState.length;
+            const cols = gridState[0].length;
+
+            board.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+            board.style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
+            board.innerHTML = '';
+
+            for (let y = 0; y < rows; y++) {
+                for (let x = 0; x < cols; x++) {
+                    const cell = gridState[y][x];
+                    const tile = document.createElement('div');
+                    tile.className = 'tile relative rounded-lg flex flex-col items-center justify-center text-center select-none overflow-hidden';
+
+                    const isPlayerHere = (playerPos.x === x && playerPos.y === y);
+
+                    if (cell === '#') {
+                        // 벽 (장기 내벽 느낌)
+                        tile.classList.add('bg-slate-800', 'border', 'border-slate-700/70');
+                    } else {
+                        // 기본 통로
+                        tile.classList.add('bg-slate-900/90', 'border', 'border-slate-800');
+
+                        // 잠긴 문 렌더링
+                        if (cell.startsWith('D')) {
+                            const door = stage.doors[cell];
+                            const reqNut = NUTRIENTS[door.req];
+                            if (openedDoors.has(cell)) {
+                                tile.classList.add('bg-emerald-950/30', 'border-emerald-500/30');
+                                tile.innerHTML = `<span class="text-[10px] text-emerald-500/60">열림</span>`;
+                            } else {
+                                tile.classList.remove('bg-slate-900/90');
+                                tile.classList.add('bg-rose-950/80', 'border-2', 'border-rose-500/70');
+                                tile.innerHTML = `
+                                    <span class="text-sm sm:text-base leading-none">🔒</span>
+                                    <span class="text-[9px] sm:text-[10px] font-bold text-rose-200 leading-tight mt-0.5 px-0.5 truncate w-full">${reqNut.name}</span>
+                                `;
+                            }
+                        }
+
+                        // 효소 아이템 렌더링
+                        if (cell.startsWith('I') && !collectedItems.has(cell)) {
+                            const enzyme = ENZYMES[stage.items[cell]];
+                            tile.classList.add('pulse-glow', 'bg-sky-950/60', 'border-sky-400/60');
+                            tile.innerHTML = `
+                                <span class="text-base sm:text-xl leading-none">${enzyme.icon}</span>
+                                <span class="text-[9px] sm:text-[10px] font-bold text-sky-300 leading-tight mt-0.5 px-0.5 truncate w-full">${enzyme.name}</span>
+                            `;
+                        }
+
+                        // 최종 출구 렌더링
+                        if (cell === 'E') {
+                            tile.classList.remove('bg-slate-900/90');
+                            tile.classList.add('bg-gradient-to-br', 'from-amber-500/30', 'to-emerald-500/30', 'border-2', 'border-amber-400');
+                            tile.innerHTML = `
+                                <span class="text-base sm:text-xl leading-none">🚪</span>
+                                <span class="text-[9px] sm:text-[10px] font-bold text-amber-300 leading-tight">출구</span>
+                            `;
+                        }
+                    }
+
+                    // 플레이어 캐릭터 오버레이
+                    if (isPlayerHere) {
+                        const playerEl = document.createElement('div');
+                        playerEl.className = 'player-bob absolute inset-0 flex items-center justify-center bg-amber-400/20 rounded-lg z-10';
+                        playerEl.innerHTML = `
+                            <div class="w-7 h-7 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 border-2 border-white shadow-lg flex items-center justify-center text-base sm:text-xl">
+                                🧑‍🔬
+                            </div>
+                        `;
+                        tile.appendChild(playerEl);
+                    }
+
+                    board.appendChild(tile);
+                }
+            }
+        }
+
+        function renderInventory() {
+            const container = document.getElementById('inventoryList');
+            container.innerHTML = '';
+
+            if (inventory.length === 0) {
+                container.innerHTML = `<div class="text-xs text-slate-400 py-3 text-center">보유 중인 영양소가 없습니다.</div>`;
+                return;
+            }
+
+            inventory.forEach(nutKey => {
+                const nut = NUTRIENTS[nutKey];
+                const card = document.createElement('div');
+                card.className = `flex items-center justify-between px-3 py-2 rounded-xl border ${nut.color} transition-all`;
+                card.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <span class="text-xl">${nut.icon}</span>
+                        <div>
+                            <div class="font-bold text-sm">${nut.name}</div>
+                            <div class="text-[11px] opacity-80">${nut.desc}</div>
+                        </div>
+                    </div>
+                    <span class="text-xs font-bold px-2 py-0.5 rounded-md bg-black/30">보유중</span>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderGoals() {
+            const stage = activeStageData;
+            const container = document.getElementById('goalList');
+            container.innerHTML = '';
+
+            stage.goal.forEach(goalKey => {
+                const nut = NUTRIENTS[goalKey];
+                const isSatisfied = inventory.includes(goalKey);
+                const badge = document.createElement('div');
+                badge.className = `flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
+                    isSatisfied
+                        ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300 shadow-sm'
+                        : 'bg-slate-800/90 border-slate-600 text-slate-400'
+                }`;
+                badge.innerHTML = `
+                    <span>${isSatisfied ? '✅' : '⬜'}</span>
+                    <span>${nut.icon} ${nut.name}</span>
+                `;
+                container.appendChild(badge);
+            });
+        }
+
+        function renderDoorInfo() {
+            const stage = activeStageData;
+            const container = document.getElementById('doorInfoList');
+            container.innerHTML = '';
+
+            Object.entries(stage.doors).forEach(([doorKey, door]) => {
+                const isOpen = openedDoors.has(doorKey);
+                const reqNut = NUTRIENTS[door.req];
+                const row = document.createElement('div');
+                row.className = `flex items-center justify-between p-2 rounded-lg border ${
+                    isOpen
+                        ? 'bg-emerald-950/30 border-emerald-500/30 text-emerald-300'
+                        : 'bg-slate-900/80 border-slate-700 text-slate-300'
+                }`;
+                row.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <span>${isOpen ? '🔓' : '🔒'}</span>
+                        <span class="font-bold">${door.label}</span>
+                    </div>
+                    <span class="text-[11px] px-2 py-0.5 rounded bg-slate-800 border border-slate-600">
+                        필요: ${reqNut.icon} ${reqNut.name}
+                    </span>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        /**
+         * ==========================================
+         * 7. 유틸리티 및 이벤트 리스너
+         * ==========================================
+         */
+        function setStatus(msg, type = 'info') {
+            const banner = document.getElementById('statusBanner');
+            banner.textContent = msg;
+            banner.className = 'w-full mt-3 px-4 py-2.5 rounded-xl border text-xs sm:text-sm text-center font-medium min-h-[44px] flex items-center justify-center transition-all ';
+
+            if (type === 'error') {
+                banner.classList.add('bg-rose-950/90', 'border-rose-500/60', 'text-rose-200');
+            } else if (type === 'success') {
+                banner.classList.add('bg-emerald-950/90', 'border-emerald-500/60', 'text-emerald-200');
+            } else if (type === 'warn') {
+                banner.classList.add('bg-amber-950/90', 'border-amber-500/60', 'text-amber-200');
+            } else {
+                banner.classList.add('bg-slate-900/90', 'border-slate-700', 'text-sky-300');
+            }
+        }
+
+        function triggerShake() {
+            const wrapper = document.getElementById('boardWrapper');
+            wrapper.classList.remove('shake');
+            void wrapper.offsetWidth; // 리플로우 강제
+            wrapper.classList.add('shake');
+        }
+
+        function toggleGuideModal(show) {
+            const modal = document.getElementById('guideModal');
+            if (show) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            } else {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        function showClearModal() {
+            const stage = activeStageData;
+            document.getElementById('clearMoves').textContent = moveCount;
+            document.getElementById('clearStageNum').textContent = isRandomMode ? `랜덤 #${randomClearCount}` : `${stage.id}단계`;
+            
+            const clearMsg = document.getElementById('clearMessage');
+            const nextBtn = document.getElementById('nextStageBtn');
+
+            if (isRandomMode) {
+                clearMsg.textContent = `랜덤 미궁 #${randomClearCount} 돌파 성공! 다음 랜덤 미궁에 도전해 보세요!`;
+                nextBtn.textContent = '다음 랜덤 스테이지 🎲';
+            } else if (isAllBasicCleared()) {
+                clearMsg.textContent = '🎊 축하합니다! 모든 기본 스테이지를 클리어하여 [무한 랜덤 미궁]이 해금되었습니다!';
+                nextBtn.textContent = '무한 랜덤 모드 시작 🎲';
+            } else if (currentStageIndex === STAGES.length - 1) {
+                clearMsg.textContent = '3단계를 클리어했습니다! 남은 기본 스테이지도 클리어해 무한 모드를 해금하세요!';
+                nextBtn.textContent = '안 깬 스테이지로 ▶';
+            } else {
+                clearMsg.textContent = '모든 영양소를 완벽하게 분해하여 출구로 탈출했습니다!';
+                nextBtn.textContent = '다음 스테이지 ▶';
+            }
+
+            const modal = document.getElementById('clearModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeClearModal() {
+            const modal = document.getElementById('clearModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // 키보드 방향키 및 WASD 지원 (한글 입력기 상태에서도 물리 키 위치인 e.code로 즉시 작동)
+        window.addEventListener('keydown', (e) => {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) {
+                e.preventDefault();
+            }
+            switch (e.code) {
+                case 'ArrowUp': case 'KeyW': movePlayer(0, -1); break;
+                case 'ArrowDown': case 'KeyS': movePlayer(0, 1); break;
+                case 'ArrowLeft': case 'KeyA': movePlayer(-1, 0); break;
+                case 'ArrowRight': case 'KeyD': movePlayer(1, 0); break;
+                case 'KeyR': resetStage(); break;
+            }
+        });
+
+        // 스와이프 제스처 지원 (모바일 편의성)
+        let touchStartX = 0;
+        let touchStartY = 0;
+        const boardEl = document.getElementById('boardWrapper');
+        boardEl.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        boardEl.addEventListener('touchend', (e) => {
+            const dx = e.changedTouches[0].screenX - touchStartX;
+            const dy = e.changedTouches[0].screenY - touchStartY;
+            if (Math.abs(dx) < 25 && Math.abs(dy) < 25) return;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                movePlayer(dx > 0 ? 1 : -1, 0);
+            } else {
+                movePlayer(0, dy > 0 ? 1 : -1);
+            }
+        }, { passive: true });
+
+        /**
+         * ==========================================
+         * 8. 배경음악(BGM) 및 효과음(SFX) 엔진 (Tone.js)
+         * ==========================================
+         */
+        let audioInitialized = false;
+        let isBgmPlaying = false;
+        let bgmLoop = null;
+        let bgmSynth = null;
+        let bassSynth = null;
+        let sfxSynth = null;
+
+        async function initAudioEngine() {
+            if (audioInitialized) return;
+            await Tone.start();
+
+            // 부드러운 신스 벨 멜로디 (퍼즐 분위기)
+            const reverb = new Tone.Reverb({ decay: 2.2, wet: 0.35 }).toDestination();
+            bgmSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'triangle' },
+                envelope: { attack: 0.04, decay: 0.25, sustain: 0.15, release: 0.8 },
+                volume: -14
+            }).connect(reverb);
+
+            // 따뜻한 베이스 라인
+            bassSynth = new Tone.Synth({
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 0.6 },
+                volume: -16
+            }).toDestination();
+
+            // 효과음용 신스
+            sfxSynth = new Tone.PolySynth(Tone.Synth, {
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.01, decay: 0.15, sustain: 0.05, release: 0.2 },
+                volume: -10
+            }).toDestination();
+
+            // 8마디 퍼즐 루프 패턴 (C Major / A Minor 펜타토닉 기반)
+            const melodyPattern = [
+                'E4', 'G4', 'A4', 'C5',  'B4', 'G4', 'E4', null,
+                'F4', 'A4', 'C5', 'D5',  'C5', 'A4', 'G4', null,
+                'E4', 'G4', 'B4', 'D5',  'C5', 'A4', 'E4', 'G4',
+                'A4', 'G4', 'E4', 'D4',  'C4', null, 'G4', null
+            ];
+            const bassPattern = [
+                'C3', null, 'G2', null,  'A2', null, 'E2', null,
+                'F2', null, 'C3', null,  'G2', null, 'D2', null,
+                'C3', null, 'E2', null,  'A2', null, 'C3', null,
+                'F2', null, 'G2', null,  'C2', null, null, null
+            ];
+
+            let step = 0;
+            Tone.Transport.bpm.value = 112;
+            bgmLoop = new Tone.Loop((time) => {
+                const idx = step % melodyPattern.length;
+                const note = melodyPattern[idx];
+                const bass = bassPattern[idx];
+                if (note) bgmSynth.triggerAttackRelease(note, '8n', time);
+                if (bass) bassSynth.triggerAttackRelease(bass, '4n', time);
+                step++;
+            }, '8n');
+
+            audioInitialized = true;
+        }
+
+        async function toggleAudio() {
+            try {
+                if (!audioInitialized) {
+                    await initAudioEngine();
+                }
+                if (Tone.context.state !== 'running') {
+                    await Tone.context.resume();
+                }
+
+                if (!isBgmPlaying) {
+                    bgmLoop.start(0);
+                    Tone.Transport.start();
+                    isBgmPlaying = true;
+                } else {
+                    Tone.Transport.pause();
+                    isBgmPlaying = false;
+                }
+                updateAudioButtonUI();
+            } catch (err) {
+                console.error('오디오 초기화 오류:', err);
+            }
+        }
+
+        function updateAudioButtonUI() {
+            const btn = document.getElementById('bgmToggleBtn');
+            const icon = document.getElementById('bgmIcon');
+            const label = document.getElementById('bgmLabel');
+            if (isBgmPlaying) {
+                btn.className = 'px-3 py-2 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs sm:text-sm font-bold rounded-xl shadow transition flex items-center gap-1';
+                icon.textContent = '🎵';
+                label.textContent = '음악 켬';
+            } else {
+                btn.className = 'px-3 py-2 bg-slate-700 hover:bg-slate-600 active:scale-95 text-slate-200 text-xs sm:text-sm font-bold rounded-xl shadow transition flex items-center gap-1';
+                icon.textContent = '🔇';
+                label.textContent = '음악 끔';
+            }
+        }
+
+        function playSfx(type) {
+            if (!audioInitialized || !isBgmPlaying || !sfxSynth) return;
+            const now = Tone.now();
+            if (type === 'step') {
+                sfxSynth.triggerAttackRelease('C5', '32n', now);
+            } else if (type === 'bump') {
+                sfxSynth.triggerAttackRelease('G2', '16n', now);
+            } else if (type === 'enzyme') {
+                sfxSynth.triggerAttackRelease('E5', '16n', now);
+                sfxSynth.triggerAttackRelease('A5', '16n', now + 0.08);
+            } else if (type === 'door') {
+                sfxSynth.triggerAttackRelease('C5', '16n', now);
+                sfxSynth.triggerAttackRelease('E5', '16n', now + 0.07);
+                sfxSynth.triggerAttackRelease('G5', '16n', now + 0.14);
+            } else if (type === 'clear') {
+                sfxSynth.triggerAttackRelease(['C5', 'E5', 'G5'], '8n', now);
+                sfxSynth.triggerAttackRelease(['D5', 'F5', 'A5'], '8n', now + 0.16);
+                sfxSynth.triggerAttackRelease(['E5', 'G5', 'C6'], '4n', now + 0.32);
+            }
+        }
+
+        // 첫 사용자 클릭/키 입력 시 배경음악 자동 시작 (브라우저 정책 준수)
+        function handleFirstInteraction() {
+            if (!audioInitialized) {
+                toggleAudio();
+            }
+            window.removeEventListener('pointerdown', handleFirstInteraction);
+            window.removeEventListener('keydown', handleFirstInteraction);
+        }
+        window.addEventListener('pointerdown', handleFirstInteraction);
+        window.addEventListener('keydown', handleFirstInteraction);
+
+        // 게임 시작
+        window.onload = initGame;
+    </script>
+</body>
+</html>
